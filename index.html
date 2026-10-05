@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BiblioServ</title>
+<style>
+*{box-sizing:border-box;margin:0}body{font-family:Segoe UI,Arial,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
+.wrap{max-width:900px;margin:0 auto;padding:40px 20px}
+h1{font-size:2rem;margin-bottom:6px}h1 span{color:#38bdf8}p.s{color:#94a3b8;margin-bottom:24px}
+.panel{background:#1e293b;border:1px solid #334155;border-radius:16px;padding:24px}
+input{width:100%;padding:12px;margin:6px 0 14px;border-radius:10px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font:inherit}
+label{font-size:.8rem;color:#94a3b8}
+button{background:#0ea5e9;color:#fff;border:0;border-radius:10px;padding:11px 18px;font:inherit;font-weight:600;cursor:pointer}
+button.sec{background:#334155}button.del{background:#7f1d1d;padding:6px 12px}
+table{width:100%;border-collapse:collapse;margin-top:16px}th,td{text-align:left;padding:11px;border-bottom:1px solid #334155;font-size:.92rem}
+th{color:#94a3b8;font-size:.78rem;text-transform:uppercase}
+.ok{color:#4ade80}.no{color:#f87171}.bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.add{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;margin-top:18px}.add input{margin:0}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#16a34a;color:#fff;padding:10px 20px;border-radius:99px;display:none}
+.hide{display:none}
+</style></head><body><div class="wrap">
+<h1>Biblio<span>Serv</span></h1><p class="s">Servicio de préstamos de libros para la biblioteca escolar</p>
+<div id="login" class="panel" style="max-width:420px">
+  <h2 style="margin-bottom:14px">Inicia sesión</h2>
+  <label>Usuario</label><input id="u" value="bibliotecario">
+  <label>Contraseña</label><input id="p" type="password" value="demo1234">
+  <button id="entrar" style="width:100%">Iniciar sesión</button><p id="err" class="no" style="margin-top:10px"></p>
+</div>
+<div id="app" class="panel hide">
+  <div class="bar"><div><b id="quien"></b><div class="s" style="margin:0">Catálogo de libros</div></div><button class="sec" id="salir">Cerrar sesión</button></div>
+  <table><thead><tr><th>ID</th><th>Título</th><th>Autor</th><th>Estado</th><th></th></tr></thead><tbody id="tb"></tbody></table>
+  <div class="add"><div><label>Título</label><input id="t"></div><div><label>Autor</label><input id="a"></div><button id="agregar">Agregar libro</button></div>
+</div><div id="toast"></div></div>
+<script>
+let TOKEN=null;const $=s=>document.querySelector(s);
+const H=()=>({"Content-Type":"application/json","Authorization":"Token "+TOKEN});
+function toast(m){const t=$("#toast");t.textContent=m;t.style.display="block";setTimeout(()=>t.style.display="none",2200)}
+async function cargar(){
+  const r=await fetch("/api/libros/",{headers:H()});const libros=await r.json();
+  $("#tb").innerHTML=libros.map(l=>`<tr><td>${l.id}</td><td>${l.titulo}</td><td>${l.autor}</td>
+  <td><span class="${l.disponible?'ok':'no'}">${l.disponible?'Disponible':'Prestado'}</span></td>
+  <td><button class="sec" onclick="alternar(${l.id},${l.disponible})">${l.disponible?'Prestar':'Devolver'}</button> <button class="del" onclick="borrar(${l.id})">Borrar</button></td></tr>`).join("");
+}
+async function alternar(i,d){await fetch(`/api/libros/${i}/`,{method:"PUT",headers:H(),body:JSON.stringify({disponible:!d})});cargar()}
+async function borrar(i){await fetch(`/api/libros/${i}/`,{method:"DELETE",headers:H()});cargar()}
+$("#entrar").onclick=async()=>{
+  const r=await fetch("/api/login/",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({usuario:$("#u").value,password:$("#p").value})});
+  const d=await r.json();if(!r.ok){$("#err").textContent=d.error;return}
+  TOKEN=d.token;$("#login").classList.add("hide");$("#app").classList.remove("hide");
+  const p=await (await fetch("/api/perfil/",{headers:H()})).json();$("#quien").textContent="Hola, "+p.usuario;
+  toast("Sesión iniciada");cargar();
+};
+$("#agregar").onclick=async()=>{
+  if(!$("#t").value||!$("#a").value)return;
+  await fetch("/api/libros/",{method:"POST",headers:H(),body:JSON.stringify({titulo:$("#t").value,autor:$("#a").value})});
+  $("#t").value="";$("#a").value="";cargar();
+};
+$("#salir").onclick=()=>location.reload();
+</script></body></html>
